@@ -105,7 +105,7 @@ Function Obtener_tokenFinal(ByVal Token As String) As String
     End Sub
 	
 	'POST
-ub PublicarGrupo(ByVal access_token As String)
+Sub PublicarGrupo(ByVal access_token As String)
         Try
 
             Dim idgrupo As String = ""
@@ -203,11 +203,11 @@ ub PublicarGrupo(ByVal access_token As String)
             Me.lblError.Visible = True
         End Try
 
-    End Sub
+ End Sub
 	
 	'PUT
 	
-	Sub marcarPost(ByVal access_token As String, ByVal idP As String)
+Sub marcarPost(ByVal access_token As String, ByVal idP As String)
 
         Dim body As String = "<?xml version='1.0' encoding='UTF-8'?><code>job</code>"
 
@@ -226,7 +226,85 @@ ub PublicarGrupo(ByVal access_token As String)
         stmFlag.Write(bytesFlag, 0, bytesFlag.Length)
         stmFlag.Close()
 
-    End Sub
+End Sub
+
+
+
+Public Function obtenerNombrePerfil(ByVal access_token As String)
+        'DATOS DE NUESTRO PERFIL PARA IDENTIFCAR NUESTROS POST
+        Dim Perfin_Data As HttpWebRequest = HttpWebRequest.Create("https://api.linkedin.com/v1/people/~?oauth2_access_token=" & access_token)
+        Dim respuestaPerfin_Data As HttpWebResponse
+
+        respuestaPerfin_Data = Perfin_Data.GetResponse
+        Dim docPerfil As New XmlDocument
+        Using srPerfil As StreamReader = New StreamReader(respuestaPerfin_Data.GetResponseStream)
+            docPerfil.LoadXml(srPerfil.ReadToEnd)
+        End Using
+
+
+
+        Dim nodoPerfil As XmlNode
+        Dim lista_nodosPerfil As XmlNodeList
+        lista_nodosPerfil = docPerfil.SelectNodes("/person")
+
+        Dim Nombre As String = ""
+
+        'INTRODUCIMOS EN UNA VARIABLE EL NOMBRE DEL PERFIL  CONCATENANDO LOS APELLIDOS
+
+        For Each nodoPerfil In lista_nodosPerfil
+            Nombre = IIf(nodoPerfil.ChildNodes.Item(0).InnerText = Nothing, "", nodoPerfil.ChildNodes.Item(0).InnerText)
+            Nombre = Nombre + " " + IIf(nodoPerfil.ChildNodes.Item(1).InnerText = Nothing, "", nodoPerfil.ChildNodes.Item(1).InnerText)
+        Next
+        Return Nombre
+   End Function
+   
+   
+   Public Function ObtenerIdPost(ByVal idgrupo As String, ByVal access_token As String)
+
+        'Nombre  se obtine el nombre del perfil con el que estamos identificados
+        Dim Nombre As String = obtenerNombrePerfil(access_token)
+
+        Dim POST_Grupos As HttpWebRequest = HttpWebRequest.Create("https://api.linkedin.com/v1/groups/" & LTrim(RTrim(idgrupo)) & "/posts?order=recency&category=discussion&oauth2_access_token=" & access_token)
+        'introducimos en la query al webservice la id del grupo deseado
+
+        Dim respuestaIdGrupo As HttpWebResponse
+        'en la respuesta del webservice d likedin obtendremos un xml con los grupos
+        'Trata el XML
+        respuestaIdGrupo = POST_Grupos.GetResponse
+        Dim docPost As New XmlDocument
+        Using srP As StreamReader = New StreamReader(respuestaIdGrupo.GetResponseStream)
+            docPost.LoadXml(srP.ReadToEnd)
+        End Using
+
+
+        ' vamos navegando por el xml e identificando cada grupo para añadirlo al arbol de grupos
+        Dim nodo As XmlNode
+        Dim lista_nodos As XmlNodeList
+        lista_nodos = docPost.SelectNodes("/posts/post")
+
+        Dim idPost As String = ""
+        Dim Creador As String = ""
+
+
+        Dim contador As Integer = 0
+        For Each nodo In lista_nodos
+            Creador = IIf(nodo.ChildNodes.Item(2).ChildNodes.Item(1).InnerText = Nothing, "", nodo.ChildNodes.Item(2).ChildNodes.Item(1).InnerText)
+            Creador = Creador + " " + IIf(nodo.ChildNodes.Item(2).ChildNodes.Item(2).InnerText = Nothing, "", nodo.ChildNodes.Item(2).ChildNodes.Item(2).InnerText)
+            'SE PREGUNTA SI EL NOMBRE DEL CREADOR DEL POST ES EL MISMO QUE DEL PERFIL CON EL QUE ESTAMOS IDENTIFICADOS
+            If Creador = Nombre Then
+                If contador = 0 Then
+                    'TOMAMOS SOLO EL PRIMER POST DE LOS PUBLICADOS POR NOSOTROS
+                    idPost = IIf(nodo.ChildNodes.Item(0).InnerText = Nothing, "", nodo.ChildNodes.Item(0).InnerText)
+                End If
+                contador = contador + 1
+            End If
+            
+        Next
+        'Puede que baste con esto
+        'idPost = IIf(nodo.ChildNodes.Item(0).InnerText = Nothing, "", nodo.ChildNodes.Item(0).InnerText)
+
+        Return idPost
+    End Function
 	
 	
 	
